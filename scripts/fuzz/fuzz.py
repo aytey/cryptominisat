@@ -89,6 +89,9 @@ def set_up_parser():
     parser.add_option("--sampling", dest="only_sampling", default=False,
                       action="store_true",
                       help="Concentrate fuzzing sampling variables")
+    parser.add_option("--userprop", dest="only_userprop", default=False,
+                      action="store_true",
+                      help="Concentrate fuzzing on the external propagator interface")
     parser.add_option("--assumps", dest="only_assumps", default=False,
                       action="store_true",
                       help="Concentrate fuzzing solving under many assumptions")
@@ -225,6 +228,7 @@ class Tester:
         self.this_gauss_on = False
         self.num_threads = 1
         self.novalgrind = options.novalgrind
+        self.userprop = 0
 
     def list_options_if_supported(self, tocheck):
         ret = []
@@ -580,13 +584,16 @@ class Tester:
         command += rnd_opts
         if self.needDebugLib:
             command += "--debuglib %s " % fname
+        if self.userprop:
+            command += "--userprop %d " % self.userprop
         command += "--threads %d " % self.num_threads
         command += options.extra_options + " "
         command += fixed_opts + " "
         self.last_solver_base_cmd = command
         if fname_frat:
-            # proofs are emitted in XLRUP, checked directly by cake_xlrup
-            command += " --xlrup 1 "
+            # proofs are emitted in XLRUP, checked directly by cake_xlrup.
+            # XLRUP cannot name the clauses of --userprop: FRAT, unchecked.
+            command += " --xlrup %d " % (0 if self.userprop else 1)
         if fname is not None:
             command += " %s " % fname
         if fname_frat:
@@ -753,7 +760,7 @@ class Tester:
 
         # it's UNSAT, the solver emitted XLRUP: check it with the verified
         # checker directly, NO elaboration (frat-rs) involved
-        if fname_frat:
+        if fname_frat and not self.userprop:
             toexec = "./cake_xlrup {cnf} {proof}"
             toexec = toexec.format(cnf=fname, proof=fname_frat)
             print("Checking with cake_xlrup.. ", toexec)
@@ -782,7 +789,7 @@ class Tester:
                 return
 
         # check with other solver
-        if fname_frat == None:
+        if fname_frat is None or self.userprop:
             ret = self.sol_parser.check_unsat(checkAgainst)
             if ret is None:
                 print("Other solver time-outed, cannot check")
@@ -800,7 +807,9 @@ class Tester:
             f.write("#!/bin/bash\n")
             f.write("set -x\n")
             f.write('CNF="${1:-%s}"\n' % fname)
-            if fname_frat:
+            if fname_frat and self.userprop:
+                f.write('%s --xlrup 0 "$CNF" "$(mktemp --suffix=.frat)"\n' % base_cmd)
+            elif fname_frat:
                 f.write("XLRUP=$(mktemp --suffix=.xlrup)\n")
                 f.write("\n")
                 f.write('%s --xlrup 1 "$CNF" "$XLRUP"\n' % base_cmd)
@@ -827,6 +836,8 @@ class Tester:
         else:
             self.num_threads = random.choice([1]+[random.randint(2,4)])
             self.num_threads = min(options.max_threads, self.num_threads)
+        if options.only_userprop:
+            self.num_threads = 1
         self.this_gauss_on = "autodisablegauss" in self.extra_opts_supported
 
         # limited runs: fuzz VERY short searches via --maxconfl/--maxtime
@@ -849,9 +860,21 @@ class Tester:
             self.frat = False
             self.only_sampling = True
 
+        # Part of the CNF reaches the solver through an external propagator
+        # (--userprop). It needs a single thread. XLRUP cannot name the
+        # clauses it hands over, so its proof is written as FRAT and left
+        # unchecked, which still runs the proof logging of the interface; a
+        # proof also rules out the multipart test, so only half as often.
+        self.userprop = 0
+        if self.num_threads == 1 \
+                and (options.only_userprop or random.randint(0, 3) == 0):
+            self.userprop = random.randint(1, 2**31-1)
+            if self.frat:
+                self.frat = random.randint(0, 1) == 0
+
         self.sqlitedbfname = None
 
-        if self.frat or options.only_assumps:
+        if self.frat or options.only_assumps or self.userprop:
             self.only_sampling = False
         else:
             self.only_sampling = random.choice([True, False, False, False, False])
@@ -1002,6 +1025,8 @@ if __name__ == "__main__":
             toexec += "--gauss "
         if options.only_sampling:
             toexec += "--sampling "
+        if options.only_userprop:
+            toexec += "--userprop "
         if options.force_threads is not None:
             toexec += "--threads %d " % options.force_threads
         toexec += "-m %d " % options.max_threads
