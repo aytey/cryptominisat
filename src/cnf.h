@@ -184,6 +184,8 @@ public:
         uint64_t clause_confls = 0;      ///< ...that were falsified
         uint64_t clause_ignored = 0;     ///< ...that were satisfied at the root
         uint64_t decisions = 0;          ///< decisions it made
+        uint64_t polarity_asked = 0;     ///< cb_decide_polarity()
+        uint64_t polarity_flips = 0;     ///< ...that flipped the sign
         uint64_t model_checks = 0;       ///< cb_check_found_model()
         uint64_t models_rejected = 0;
         uint64_t forced_backtracks = 0;
@@ -223,9 +225,12 @@ public:
     /// A backtrack is being notified: the same freeze, as whoever backtracked
     /// counts on the level it asked for
     bool ext_backtracking = false;
+    /// Polarity advice is being asked for: the same freeze, as the callback
+    /// must not change the solver.
+    bool ext_advising = false;
     /// No variable can be created, and observed ones cannot change
     [[nodiscard]] bool ext_frozen() const {
-        return ext_explaining || ext_backtracking;
+        return ext_explaining || ext_backtracking || ext_advising;
     }
     [[nodiscard]] bool ext_prop_active() const {
         return ext_prop != nullptr && !ext_prop_private_steps;

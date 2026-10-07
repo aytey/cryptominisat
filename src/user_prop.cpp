@@ -81,7 +81,7 @@ void Solver::add_observed_var(const uint32_t outer_var)
     //var_data is never shrunk by renumbering, so this is safe to ask first
     if (var_data[map_outer_to_inter(outer_var)].observed) return;
     release_assert(!ext_frozen() && "The set of observed variables cannot change from"
-        " cb_add_reason_clause_lit() or notify_backtrack()");
+        " cb_add_reason_clause_lit(), cb_decide_polarity() or notify_backtrack()");
 
     //Once the clauses are UNSAT there is no more search, and a variable that
     //was renumbered or eliminated away cannot be put back: only record it
@@ -154,7 +154,7 @@ void Solver::remove_observed_var(const uint32_t outer_var)
     const uint32_t inter_var = map_outer_to_inter(outer_var);
     if (!var_data[inter_var].observed) return;
     release_assert(!ext_frozen() && "The set of observed variables cannot change from"
-        " cb_add_reason_clause_lit() or notify_backtrack()");
+        " cb_add_reason_clause_lit(), cb_decide_polarity() or notify_backtrack()");
 
     //Unassign it first: an external propagation over it could no longer be
     //explained once it is un-observed
@@ -178,7 +178,7 @@ void Solver::remove_observed_var(const uint32_t outer_var)
 void Solver::reset_observed_vars()
 {
     release_assert(!ext_frozen() && "The set of observed variables cannot change from"
-        " cb_add_reason_clause_lit() or notify_backtrack()");
+        " cb_add_reason_clause_lit(), cb_decide_polarity() or notify_backtrack()");
     //Backtrack once, below the earliest non-root observed assignment, so every
     //lazy external propagation is undone while its reason can still be asked
     //for. Root external propagations are always explained eagerly.
@@ -622,6 +622,30 @@ Lit Searcher::ext_decide()
     if (value(ilit) != l_Undef) return lit_Undef;
     ext_stats.decisions++;
     return ilit;
+}
+
+//Not part of IPASIR-UP: sign-only advice on a decision the solver's heuristic
+//made. Nothing was assigned since cb_decide(), so the view is up to date.
+Lit Searcher::ext_advise_polarity(const Lit lit)
+{
+    if (!ext_prop_active() || ext_prop->is_lazy || !ext_prop->advises_polarity
+        || !var_data[lit.var()].observed
+    ) {
+        return lit;
+    }
+    assert(ext_notified == trail.size() && ext_pending_fixed.empty());
+
+    const Lit elit = map_inter_to_outer(lit);
+    ext_stats.cb_calls++;
+    ext_stats.polarity_asked++;
+    ext_advising = true;
+    const Lit advice = ext_prop->cb_decide_polarity(elit);
+    ext_advising = false;
+    release_assert((advice == elit || advice == ~elit) &&
+        "cb_decide_polarity() must return the literal it was given or its negation");
+    if (advice == elit) return lit;
+    ext_stats.polarity_flips++;
+    return ~lit;
 }
 
 /**

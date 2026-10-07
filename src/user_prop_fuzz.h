@@ -54,6 +54,7 @@ public:
         forget_pct    = next() % 80;
         decide_pct    = chance(50) ? next() % 20 : 0;
         backtracks_left = chance(50) ? next() % 50 : 0;
+        flip_pct      = next() % 100;
         perturb_pct   = chance(40) ? 1 + next() % 5 : 0;
         unobserve_pct = chance(50) ? next() % 50 : 0;
         reset_pct     = chance(20) ? 1 + next() % 3 : 0;
@@ -212,6 +213,14 @@ public:
         return Lit(v, chance(50));
     }
 
+    Lit cb_decide_polarity(Lit lit) override {
+        check(advises_polarity && !is_lazy, "polarity advice asked for unrequested");
+        check(observed_var(lit.var()), "polarity advice asked for an unobserved variable");
+        check(val[lit.var()] == l_Undef, "polarity advice asked for an assigned variable");
+        ignored_backtrack();
+        return chance(flip_pct) ? ~lit : lit;
+    }
+
     // Unit (or falsified) under the notified trail: propagate, and remember the
     // clause, which is the reason whenever it is asked for.
     Lit cb_propagate() override {
@@ -291,7 +300,7 @@ private:
     SATSolver* s;
     uint64_t rnd;
     uint32_t hold_pct, defer_pct, extra_pct, phase_pct, prop_pct;
-    uint32_t volunteer_pct, forget_pct, decide_pct, backtracks_left;
+    uint32_t volunteer_pct, forget_pct, decide_pct, backtracks_left, flip_pct;
     uint32_t perturb_pct, unobserve_pct, reset_pct, new_var_pct, new_vars_left, stale_pct;
     uint32_t model_bt_left, ignored_pct, shape_pct, between_pct, budget_pct;
     uint32_t interrupt_pct;
@@ -333,6 +342,7 @@ private:
     }
 
     void roll_flags() {
+        advises_polarity = chance(50);
         are_reasons_forgettable = chance(50);
         is_lazy = chance(10);
     }

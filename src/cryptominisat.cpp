@@ -1968,7 +1968,7 @@ void ext_flush_vars(CMSatPrivateData* data)
     }
     if (data->vars_to_add == 0) return;
     release_assert(!data->solvers[0]->ext_frozen() && "Variables cannot be created from"
-        " cb_add_reason_clause_lit() or notify_backtrack()");
+        " cb_add_reason_clause_lit(), cb_decide_polarity() or notify_backtrack()");
     data->solvers[0]->new_vars(data->vars_to_add);
     data->vars_to_add = 0;
 }
