@@ -120,6 +120,7 @@ set(cryptoms_lib_files
     completedetachreattacher.cpp
     searcher.cpp
     solver.cpp
+    user_prop.cpp
     hyperengine.cpp
     subsumeimplicit.cpp
     datasync.cpp
@@ -334,6 +335,7 @@ cmsat_add_public_header(cryptominisat5 ${CMAKE_CURRENT_SOURCE_DIR}/cryptominisat
 cmsat_add_public_header(cryptominisat5 ${CMAKE_CURRENT_SOURCE_DIR}/mpicosat/mpicosat.h)
 cmsat_add_public_header(cryptominisat5 ${CMAKE_CURRENT_SOURCE_DIR}/cryptominisat.h)
 cmsat_add_public_header(cryptominisat5 ${CMAKE_CURRENT_SOURCE_DIR}/solvertypesmini.h)
+cmsat_add_public_header(cryptominisat5 ${CMAKE_CURRENT_SOURCE_DIR}/user_prop.h)
 cmsat_add_public_header(cryptominisat5 ${CMAKE_CURRENT_SOURCE_DIR}/dimacsparser.h)
 cmsat_add_public_header(cryptominisat5 ${CMAKE_CURRENT_SOURCE_DIR}/streambuffer.h)
 
